@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
+import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
+import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
 
@@ -66,6 +68,56 @@ function App() {
       return [];
     }
   });
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const promptsRef = useRef(prompts);
+
+  // Auth
+  const { userEmail, handleLogin, handleLogout } = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  // 从云端加载配方和收藏（如果有云端数据，合并到本地）
+  useEffect(() => {
+    if (cloudSynced) return;
+    setCloudSynced(true);
+
+    Promise.all([
+      loadRecipesFromCloud(),
+      loadFavoritesFromCloud(),
+    ]).then(([cloudRecipes, cloudFavorites]) => {
+      // 合并配方
+      if (cloudRecipes && cloudRecipes.length > 0) {
+        try {
+          const localRaw = localStorage.getItem('my_ai_recipes_v1');
+          const localRecipes = localRaw ? JSON.parse(localRaw) : [];
+
+          const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
+          const merged = [
+            ...cloudRecipes,
+            ...localRecipes.filter(p => {
+              const id = p.id || `${p.title}-${p.category}`;
+              return !cloudIds.has(id);
+            }),
+          ];
+          setRecipe(merged);
+        } catch (e) {
+          setRecipe(cloudRecipes);
+        }
+      }
+
+      // 合并收藏
+      if (cloudFavorites && cloudFavorites.length > 0) {
+        try {
+          const localRaw = localStorage.getItem('my_ai_favorites_v1');
+          const localFavorites = localRaw ? JSON.parse(localRaw) : [];
+
+          const merged = Array.from(new Set([...cloudFavorites, ...localFavorites]));
+          setFavoriteIds(merged);
+        } catch (e) {
+          setFavoriteIds(cloudFavorites);
+        }
+      }
+    });
+  }, [cloudSynced]);
   const STORAGE_KEYS = {
     RECIPES: 'my_ai_recipes_v1',
     FAVORITES: 'my_ai_favorites_v1',
@@ -78,6 +130,8 @@ function App() {
     } catch (e) {
       // ignore
     }
+    // 同步到云端（静默失败，不影响本地体验）
+    saveRecipesToCloud(recipe).catch(() => {});
   }, [recipe]);
 
   useEffect(() => {
@@ -267,9 +321,19 @@ function App() {
 
   const toggleFavorite = (prompt) => {
     const id = getPromptId(prompt);
-    setFavoriteIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    setFavoriteIds((prev) => {
+      const isAdding = !prev.includes(id);
+      const next = isAdding ? [...prev, id] : prev.filter((item) => item !== id);
+
+      // 同步到云端
+      if (isAdding) {
+        saveFavoriteToCloud(id, prompt.title, prompt.category, prompt.content || '').catch(() => {});
+      } else {
+        deleteFavoriteFromCloud(id).catch(() => {});
+      }
+
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -310,6 +374,13 @@ function App() {
           <div className="absolute inset-0 bg-black/60" />
 
           <div className="relative mx-auto flex max-w-5xl flex-col items-center text-center">
+            <div className="absolute right-0 top-0">
+              <UserMenu
+                userEmail={userEmail}
+                onLogin={() => setAuthModalOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.25em] text-amber-300">
               <span className="tracking-[0.25em]">AI 视频提示词宝库</span>
               <span className="rounded-full bg-black/20 px-2.5 py-0.5 text-[12px] font-semibold tracking-[0.2em] text-amber-200">
@@ -395,6 +466,23 @@ function App() {
         {categoryPinned ? <div className="h-14" /> : null}
 
         <main id="library" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {activeCategory === '配方' && !userEmail && (
+              <div className="col-span-2 rounded-xl border border-white/10 bg-white/5 p-6 text-center sm:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5">
+                <div className="mx-auto max-w-md">
+                  <div className="mb-3 text-3xl">☁️</div>
+                  <h3 className="text-lg font-semibold text-white">登录以同步配方</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    登录后，你的自定义配方将永久保存在云端，换设备也能随时查看。
+                  </p>
+                  <button
+                    onClick={() => setAuthModalOpen(true)}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-500 px-4 py-2 text-sm font-medium text-black transition hover:bg-amber-400"
+                  >
+                    立即登录
+                  </button>
+                </div>
+              </div>
+            )}
             {activeCategory === '配方' && (
               <button
                 type="button"
@@ -563,6 +651,14 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onLogin={handleLogin}
+        userEmail={userEmail}
+      />
     </div>
   );
 }
