@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 开发环境走本地代理（必须是完整 HTTP/HTTPS URL），线上环境用环境变量真实地址
+// 开发环境走本地代理，线上环境直连 Supabase
 const supabaseUrl = import.meta.env.DEV
   ? 'http://localhost:3000/supabase'
-  : import.meta.env.VITE_SUPABASE_URL
-
+  : (import.meta.env.VITE_SUPABASE_URL || 'https://uspynsimapaywviylbdh.supabase.co')
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = supabaseUrl && supabaseAnonKey
