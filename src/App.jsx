@@ -648,10 +648,6 @@ function App() {
                             disabled={!prompt.content || !prompt.content.trim()}
                             className={`rounded-lg border border-emerald-400/20 px-3 py-2 text-sm font-medium transition ${prompt.content && prompt.content.trim() ? 'bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}
                           >创建配方卡片</button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); removeFromRecipe(prompt); }}
-                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300"
-                          >从工作台移除</button>
                           {prompt.custom && (
                             <button
                               onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这个配方吗？')) deleteCustomRecipe(prompt.id); }}
