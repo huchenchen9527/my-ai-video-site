@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, loadStatsFromCloud, saveStatsToCloud } from './cloud-sync';
+import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -59,14 +59,7 @@ function App() {
   });
   const [videoError, setVideoError] = useState(false);
   const [categoryPinned, setCategoryPinned] = useState(false);
-  const [copiedCount, setCopiedCount] = useState(() => {
-    try {
-      const raw = localStorage.getItem('my_ai_copied_count_v1');
-      return raw ? parseInt(raw, 10) : 0;
-    } catch {
-      return 0;
-    }
-  });
+  const [copiedCount, setCopiedCount] = useState(0);
   const [recipe, setRecipe] = useState(() => {
     try {
       const raw = localStorage.getItem('my_ai_recipes_v1');
@@ -90,8 +83,7 @@ function App() {
     Promise.all([
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
-      loadStatsFromCloud(),
-    ]).then(([cloudRecipes, cloudFavorites, cloudStats]) => {
+    ]).then(([cloudRecipes, cloudFavorites]) => {
       // 合并配方
       if (cloudRecipes && cloudRecipes.length > 0) {
         try {
@@ -99,13 +91,8 @@ function App() {
           const localRecipes = localRaw ? JSON.parse(localRaw) : [];
 
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
-          // 将数据库字段 in_workbench 映射为 inWorkbench
-          const mappedCloudRecipes = cloudRecipes.map(p => ({
-            ...p,
-            inWorkbench: p.in_workbench !== undefined ? p.in_workbench : (p.custom === true ? false : true),
-          }));
           const merged = [
-            ...mappedCloudRecipes,
+            ...cloudRecipes,
             ...localRecipes.filter(p => {
               const id = p.id || `${p.title}-${p.category}`;
               return !cloudIds.has(id);
@@ -129,38 +116,22 @@ function App() {
           setFavoriteIds(cloudFavorites);
         }
       }
-
-      // 合并统计
-      if (cloudStats) {
-        try {
-          const localRaw = localStorage.getItem('my_ai_copied_count_v1');
-          const localCount = localRaw ? parseInt(localRaw, 10) : 0;
-          const mergedCount = Math.max(cloudStats.copied_count || 0, localCount);
-          setCopiedCount(mergedCount);
-        } catch (e) {
-          // ignore
-        }
-      }
     });
   }, [cloudSynced]);
   const STORAGE_KEYS = {
     RECIPES: 'my_ai_recipes_v1',
     FAVORITES: 'my_ai_favorites_v1',
     ACTIVE_CATEGORY: 'my_ai_active_category_v1',
-    COPIED_COUNT: 'my_ai_copied_count_v1',
   };
 
   useEffect(() => {
     try {
-      // 只保存非草稿配方
-      const nonDraftRecipes = recipe.filter(p => !p.draft);
-      localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(nonDraftRecipes));
+      localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipe));
     } catch (e) {
       // ignore
     }
     // 同步到云端（静默失败，不影响本地体验）
-    const cloudRecipes = recipe.filter(p => !p.draft);
-    saveRecipesToCloud(cloudRecipes).catch(() => {});
+    saveRecipesToCloud(recipe).catch(() => {});
   }, [recipe]);
 
   useEffect(() => {
@@ -170,16 +141,6 @@ function App() {
       // ignore
     }
   }, [favoriteIds]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.COPIED_COUNT, String(copiedCount));
-    } catch (e) {
-      // ignore
-    }
-    // 同步到云端
-    saveStatsToCloud(copiedCount).catch(() => {});
-  }, [copiedCount]);
 
   useEffect(() => {
     setCategoryHash(activeCategory);
@@ -195,15 +156,11 @@ function App() {
     return `${prompt.title}-${prompt.category}`;
   };
 
-  // ---------- 修改点 1：过滤逻辑，'配方'只显示自定义配方 ----------
   const filteredPrompts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
 
     if (activeCategory === '配方') {
-      // 只显示自定义配方（custom: true），不显示普通提示词
       return recipe.filter((prompt) => {
-        if (!prompt.custom) return false;           // 只显示自定义
-        if (prompt.draft && !prompt.editing) return false;
         const matchesSearch =
           !query ||
           prompt.title.toLowerCase().includes(query) ||
@@ -281,39 +238,22 @@ function App() {
 
       setCopiedId(id);
       setCopiedCount((prev) => prev + 1);
-      window.setTimeout(() => setCopiedId(null), 1400);
+      setTimeout(() => setCopiedId(null), 1400);
     } catch {
       setCopiedId(null);
     }
   };
 
-  // ---------- 修改点 2：加入/移出工作台（区分自定义和普通） ----------
   const addToRecipe = (prompt) => {
     const id = getPromptId(prompt);
     setRecipe((prev) => {
-      const existing = prev.find(p => p.id === id);
-      if (existing) {
-        if (existing.custom) {
-          // 自定义配方：切换 inWorkbench
-          return prev.map(p =>
-            p.id === id ? { ...p, inWorkbench: !p.inWorkbench } : p
-          );
-        } else {
-          // 普通提示词：移除
-          return prev.filter(p => p.id !== id);
-        }
-      } else {
-        // 不存在：添加，自定义配方设置 inWorkbench: true
-        const newItem = { ...prompt, id };
-        if (prompt.custom) {
-          newItem.inWorkbench = true;
-        }
-        return [...prev, newItem];
+      if (prev.find((p) => p.id === id)) {
+        return prev.filter((p) => p.id !== id);
       }
+      return [...prev, { ...prompt, id, category: prompt.category || '配方' }];
     });
   };
 
-  // ---------- 修改点 3：新建自定义配方，默认不加入工作台 ----------
   const createCustomRecipe = () => {
     const newRecipe = {
       id: `custom-${Date.now()}`,
@@ -323,8 +263,6 @@ function App() {
       custom: true,
       editing: true,
       saved: false,
-      draft: true,
-      inWorkbench: false,   // 默认不进入工作台
     };
     setRecipe((prev) => [newRecipe, ...prev]);
     setActiveCategory('配方');
@@ -332,7 +270,21 @@ function App() {
 
   const updateRecipeField = (id, field, value) => {
     setRecipe((prev) => {
-      return prev.map((item) => (item.id === id ? { ...item, [field]: value } : item));
+      const updated = prev.map((item) => (item.id === id ? { ...item, [field]: value } : item));
+      // Auto-save custom recipes when title or content changes
+      if (field === 'title' || field === 'content') {
+        const changedItem = updated.find((item) => item.id === id);
+        if (changedItem && changedItem.custom && changedItem.content && changedItem.content.trim()) {
+          const autoSaved = updated.map((item) => {
+            if (item.id === id && !item.saved) {
+              return { ...item, saved: true };
+            }
+            return item;
+          });
+          return autoSaved;
+        }
+      }
+      return updated;
     });
   };
 
@@ -341,7 +293,7 @@ function App() {
       prev.map((item) => {
         if (item.id !== id) return item;
         if (!item.content || !item.content.trim()) return item;
-        return { ...item, editing: false, saved: true, draft: false };
+        return { ...item, editing: false, saved: true };
       })
     );
   };
@@ -354,45 +306,16 @@ function App() {
     );
   };
 
-  // ---------- 修改点 4：从工作台移除（自定义只隐藏，普通删除） ----------
   const removeFromRecipe = (prompt) => {
     const id = getPromptId(prompt);
-    setRecipe(prev => {
-      const existing = prev.find(p => p.id === id);
-      if (existing && existing.custom) {
-        // 自定义配方：仅隐藏，不删除
-        return prev.map(p => p.id === id ? { ...p, inWorkbench: false } : p);
-      } else {
-        // 普通项：删除
-        return prev.filter(p => p.id !== id);
-      }
-    });
+    setRecipe((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // 删除自定义配方（真正从列表中移除）
-  const deleteCustomRecipe = (id) => {
-    setRecipe(prev => prev.filter(p => p.id !== id));
-  };
+  const clearRecipe = () => setRecipe([]);
 
-  // ---------- 修改点 5：清空工作台（自定义隐藏，普通删除） ----------
-  const clearRecipe = () => {
-    setRecipe(prev =>
-      prev
-        .map(item => {
-          if (item.custom) {
-            return { ...item, inWorkbench: false };
-          }
-          return null; // 普通项标记为删除
-        })
-        .filter(Boolean)
-    );
-  };
-
-  // ---------- 修改点 6：组合复制只复制工作台可见项 ----------
   const copyCombinedRecipe = async () => {
-    const workbenchItems = recipe.filter(item => item.inWorkbench !== false);
-    if (workbenchItems.length === 0) return;
-    const combined = workbenchItems.map((p) => p.content).join('\n\n-----\n\n');
+    if (recipe.length === 0) return;
+    const combined = recipe.map((p) => p.content).join('\n\n-----\n\n');
     await handleCopy(combined, `combined-${Date.now()}`);
   };
 
@@ -576,7 +499,7 @@ function App() {
             filteredPrompts.map((prompt) => {
               const cardId = getPromptId(prompt);
               const isCopied = copiedId === cardId;
-              const canFavorite = prompt.saved !== false;
+              const canFavorite = true;
 
               return (
                 <article
@@ -585,27 +508,27 @@ function App() {
                   className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition duration-200 hover:-translate-y-1 hover:border-amber-400/40"
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
-                  <div className="relative flex h-full flex-col pr-12">
-                    {canFavorite && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleFavorite(prompt); }}
-                        className={`absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                          favoriteIds.includes(cardId)
-                            ? 'border-amber-400/50 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.24)]'
-                            : 'border-white/10 bg-black/20 text-slate-400 hover:text-amber-300'
-                        }`}
-                        aria-label={favoriteIds.includes(cardId) ? '取消收藏' : '收藏'}
-                      >
-                        ★
-                      </button>
-                    )}
-                    
-                    <div className="flex items-start gap-3">
+                  <div className="relative flex h-full flex-col">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-400/90">{prompt.category}</p>
                         <h2 className="mt-2 text-lg font-semibold text-white">{prompt.title}</h2>
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); if (canFavorite) toggleFavorite(prompt); }}
+                        disabled={!canFavorite}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                          favoriteIds.includes(cardId)
+                            ? 'border-amber-400/50 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.24)]'
+                            : canFavorite
+                              ? 'border-white/10 bg-black/20 text-slate-400 hover:text-amber-300'
+                              : 'border-white/10 bg-black/10 text-slate-600 opacity-50 cursor-not-allowed'
+                        }`}
+                        aria-label={favoriteIds.includes(cardId) ? '取消收藏' : canFavorite ? '收藏' : '不可收藏'}
+                      >
+                        ★
+                      </button>
                     </div>
 
                     {prompt.editing ? (
@@ -634,12 +557,10 @@ function App() {
                             disabled={!prompt.content || !prompt.content.trim()}
                             className={`rounded-lg border border-emerald-400/20 px-3 py-2 text-sm font-medium transition ${prompt.content && prompt.content.trim() ? 'bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}
                           >创建配方卡片</button>
-                          {prompt.custom && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这个配方吗？')) deleteCustomRecipe(prompt.id); }}
-                              className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20"
-                            >删除</button>
-                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeFromRecipe(prompt); }}
+                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300"
+                          >移除</button>
                         </div>
                       </div>
                     ) : (
@@ -654,36 +575,17 @@ function App() {
                             {isCopied ? '已复制' : '复制'}
                           </button>
                           {prompt.saved && !prompt.editing && (
-                            <>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); editRecipeCard(prompt.id); }}
-                                className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
-                              >编辑</button>
-                              {prompt.custom && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这个配方吗？')) deleteCustomRecipe(prompt.id); }}
-                                  className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20"
-                                >删除</button>
-                              )}
-                            </>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); editRecipeCard(prompt.id); }}
+                              className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
+                            >编辑</button>
                           )}
                           <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); addToRecipe(prompt); }}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                              recipe.find((p) => {
-                                if (p.custom) {
-                                  return p.id === prompt.id && p.inWorkbench !== false;
-                                }
-                                return p.id === prompt.id || `${p.title}-${p.category}` === cardId;
-                              }) ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-                            }`}
+                            className={`min-w-[84px] rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
                           >
-                            {recipe.find((p) => {
-                              if (p.custom) {
-                                return p.id === prompt.id && p.inWorkbench !== false;
-                              }
-                              return p.id === prompt.id || `${p.title}-${p.category}` === cardId;
-                            }) ? '已加入配方' : '加入配方'}
+                            {recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? '已加入配方' : '加入配方'}
                           </button>
                         </div>
                       </>
@@ -714,13 +616,12 @@ function App() {
             ))}
           </div>
         </section>
-
-        {recipe.filter(item => item.inWorkbench !== false).length > 0 && (
+        {recipe.length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 overflow-x-auto pl-1">
                 <span className="text-sm text-slate-300">工作台：</span>
-                {recipe.filter(item => item.inWorkbench !== false).map((p) => {
+                {recipe.map((p) => {
                   const id = `${p.title}-${p.category}`;
                   return (
                     <div key={id} className="flex items-center gap-2 rounded-md border border-white/5 bg-white/3 px-3 py-2 text-sm text-slate-200">
@@ -737,12 +638,10 @@ function App() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={copyCombinedRecipe}
-                  disabled={recipe.filter(item => item.inWorkbench !== false).length < 2}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.filter(item => item.inWorkbench !== false).length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
+                  disabled={recipe.length < 2}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
                 >
-                  {recipe.filter(item => item.inWorkbench !== false).length >= 2
-                    ? `复制组合配方 (${recipe.filter(item => item.inWorkbench !== false).length})`
-                    : '至少两个可组合'}
+                  {recipe.length >= 2 ? `复制组合配方 (${recipe.length})` : '至少两个可组合'}
                 </button>
                 <button
                   onClick={() => clearRecipe()}

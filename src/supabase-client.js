@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 // 开发环境走本地代理，线上环境直连 Supabase
 const supabaseUrl = import.meta.env.DEV
   ? 'http://localhost:3000/supabase'
-  : (import.meta.env.VITE_SUPABASE_URL || 'https://uspynsimapaywviyldbh.supabase.co')
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_cgVZQRVFa5RuTCm0Muq81w_9t3Tc3wx'
+  : import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
