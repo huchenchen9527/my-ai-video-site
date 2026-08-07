@@ -68,6 +68,14 @@ function App() {
       return [];
     }
   });
+  const [workbench, setWorkbench] = useState(() => {
+    try {
+      const raw = localStorage.getItem('my_ai_workbench_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [cloudSynced, setCloudSynced] = useState(false);
   const promptsRef = useRef(prompts);
 
@@ -120,6 +128,7 @@ function App() {
   }, [cloudSynced]);
   const STORAGE_KEYS = {
     RECIPES: 'my_ai_recipes_v1',
+    WORKBENCH: 'my_ai_workbench_v1',
     FAVORITES: 'my_ai_favorites_v1',
     ACTIVE_CATEGORY: 'my_ai_active_category_v1',
   };
@@ -133,6 +142,14 @@ function App() {
     // 同步到云端（静默失败，不影响本地体验）
     saveRecipesToCloud(recipe).catch(() => {});
   }, [recipe]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.WORKBENCH, JSON.stringify(workbench));
+    } catch (e) {
+      // ignore
+    }
+  }, [workbench]);
 
   useEffect(() => {
     try {
@@ -246,11 +263,25 @@ function App() {
 
   const addToRecipe = (prompt) => {
     const id = getPromptId(prompt);
-    setRecipe((prev) => {
-      if (prev.find((p) => p.id === id)) {
+    const isCustom = prompt.custom === true;
+    
+    // 如果是自定义配方，切换 inWorkbench 状态
+    if (isCustom) {
+      setRecipe((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, inWorkbench: !p.inWorkbench } : p
+        )
+      );
+      return;
+    }
+    
+    // 预设提示词：添加到/从 workbench 移除
+    setWorkbench((prev) => {
+      const exists = prev.find((p) => p.id === id);
+      if (exists) {
         return prev.filter((p) => p.id !== id);
       }
-      return [...prev, { ...prompt, id, category: prompt.category || '配方' }];
+      return [...prev, { ...prompt, id, category: prompt.category }];
     });
   };
 
@@ -263,6 +294,7 @@ function App() {
       custom: true,
       editing: true,
       saved: false,
+      inWorkbench: false,
     };
     setRecipe((prev) => [newRecipe, ...prev]);
     setActiveCategory('配方');
@@ -311,11 +343,37 @@ function App() {
     setRecipe((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const clearRecipe = () => setRecipe([]);
+  const removeFromWorkbench = (prompt) => {
+    const id = getPromptId(prompt);
+    const isCustom = prompt.custom === true;
+    
+    // 如果是自定义配方，切换 inWorkbench 状态
+    if (isCustom) {
+      setRecipe((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, inWorkbench: false } : p))
+      );
+      return;
+    }
+    
+    // 预设提示词：从 workbench 移除
+    setWorkbench((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const clearRecipe = () => {
+    // 清空 workbench
+    setWorkbench([]);
+    // 把自定义配方的 inWorkbench 设为 false
+    setRecipe((prev) => prev.map((p) => ({ ...p, inWorkbench: false })));
+  };
+
+  const workbenchItems = useMemo(() => {
+    const customInWorkbench = recipe.filter(p => p.inWorkbench !== false);
+    return [...workbench, ...customInWorkbench];
+  }, [workbench, recipe]);
 
   const copyCombinedRecipe = async () => {
-    if (recipe.length === 0) return;
-    const combined = recipe.map((p) => p.content).join('\n\n-----\n\n');
+    if (workbenchItems.length === 0) return;
+    const combined = workbenchItems.map((p) => p.content).join('\n\n-----\n\n');
     await handleCopy(combined, `combined-${Date.now()}`);
   };
 
@@ -499,7 +557,10 @@ function App() {
             filteredPrompts.map((prompt) => {
               const cardId = getPromptId(prompt);
               const isCopied = copiedId === cardId;
-              const canFavorite = true;
+              const isCustomRecipe = prompt.custom === true;
+              const canFavorite = !prompt.editing;
+              const isInWorkbench = !isCustomRecipe ? workbench.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) : prompt.inWorkbench !== false;
+              const showAddToWorkbench = isCustomRecipe || prompt.saved !== false;
 
               return (
                 <article
@@ -510,9 +571,9 @@ function App() {
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
                   <div className="relative flex h-full flex-col">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-400/90">{prompt.category}</p>
-                        <h2 className="mt-2 text-lg font-semibold text-white">{prompt.title}</h2>
+                        <h2 className="mt-2 text-lg font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis">{prompt.title}</h2>
                       </div>
                       <button
                         type="button"
@@ -580,13 +641,22 @@ function App() {
                               className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
                             >编辑</button>
                           )}
+                          {isCustomRecipe && prompt.saved !== false && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeFromRecipe(prompt); }}
+                              className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/20"
+                            >移除</button>
+                          )}
+                          {showAddToWorkbench && (
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); addToRecipe(prompt); }}
-                            className={`min-w-[84px] rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                            className={`min-w-[84px] rounded-lg border px-3 py-2 text-sm font-medium transition ${isInWorkbench ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
                           >
-                            {recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? '已加入配方' : '加入配方'}
+                            {isInWorkbench ? '已加入配方' : '加入配方'}
                           </button>
+                          )}
                         </div>
                       </>
                     )}
@@ -616,18 +686,18 @@ function App() {
             ))}
           </div>
         </section>
-        {recipe.length > 0 && (
+        {workbenchItems.length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 overflow-x-auto pl-1">
                 <span className="text-sm text-slate-300">工作台：</span>
-                {recipe.map((p) => {
+                {workbenchItems.map((p) => {
                   const id = `${p.title}-${p.category}`;
                   return (
                     <div key={id} className="flex items-center gap-2 rounded-md border border-white/5 bg-white/3 px-3 py-2 text-sm text-slate-200">
                       <div className="max-w-[220px] truncate">{p.title}</div>
                       <button
-                        onClick={(e) => { e.stopPropagation(); removeFromRecipe(p); }}
+                        onClick={(e) => { e.stopPropagation(); removeFromWorkbench(p); }}
                         className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300"
                       >移除</button>
                     </div>
@@ -638,10 +708,10 @@ function App() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={copyCombinedRecipe}
-                  disabled={recipe.length < 2}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
+                  disabled={workbenchItems.length < 2}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${workbenchItems.length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
                 >
-                  {recipe.length >= 2 ? `复制组合配方 (${recipe.length})` : '至少两个可组合'}
+                  {workbenchItems.length >= 2 ? `复制组合配方 (${workbenchItems.length})` : '至少两个可组合'}
                 </button>
                 <button
                   onClick={() => clearRecipe()}
