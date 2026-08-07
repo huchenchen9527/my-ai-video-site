@@ -600,26 +600,28 @@ function App() {
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
                   <div className="relative flex h-full flex-col">
-                    <div className="flex items-start justify-between gap-3">
+                    {/* 收藏按钮 - 绝对定位在右上角 */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); if (canFavorite) toggleFavorite(prompt); }}
+                      disabled={!canFavorite}
+                      className={`absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                        favoriteIds.includes(cardId)
+                          ? 'border-amber-400/50 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.24)]'
+                          : canFavorite
+                            ? 'border-white/10 bg-black/20 text-slate-400 hover:text-amber-300'
+                            : 'border-white/10 bg-black/10 text-slate-600 opacity-50 cursor-not-allowed'
+                      }`}
+                      aria-label={favoriteIds.includes(cardId) ? '取消收藏' : canFavorite ? '收藏' : '不可收藏'}
+                    >
+                      ★
+                    </button>
+                    
+                    <div className="flex items-start gap-3">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-400/90">{prompt.category}</p>
                         <h2 className="mt-2 text-lg font-semibold text-white">{prompt.title}</h2>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); if (canFavorite) toggleFavorite(prompt); }}
-                        disabled={!canFavorite}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                          favoriteIds.includes(cardId)
-                            ? 'border-amber-400/50 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.24)]'
-                            : canFavorite
-                              ? 'border-white/10 bg-black/20 text-slate-400 hover:text-amber-300'
-                              : 'border-white/10 bg-black/10 text-slate-600 opacity-50 cursor-not-allowed'
-                        }`}
-                        aria-label={favoriteIds.includes(cardId) ? '取消收藏' : canFavorite ? '收藏' : '不可收藏'}
-                      >
-                        ★
-                      </button>
                     </div>
 
                     {prompt.editing ? (
