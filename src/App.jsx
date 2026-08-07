@@ -585,7 +585,7 @@ function App() {
                   className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition duration-200 hover:-translate-y-1 hover:border-amber-400/40"
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
-                  <div className="relative flex h-full flex-col">
+                  <div className="relative flex h-full flex-col pr-12">
                     {canFavorite && (
                       <button
                         type="button"
