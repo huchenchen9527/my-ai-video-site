@@ -146,3 +146,44 @@ export async function deleteFavorite(id) {
 
   return !error;
 }
+
+// 加载用户统计
+export async function loadStats() {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('user_stats')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // 没有记录
+    console.warn('Failed to load stats:', error);
+    return null;
+  }
+  return data;
+}
+
+// 保存用户统计到云端
+export async function saveStats(copiedCount) {
+  if (!supabase) return false;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('user_stats')
+    .upsert({
+      user_id: user.id,
+      copied_count: copiedCount,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+
+  if (error) {
+    console.warn('Failed to save stats:', error);
+    return false;
+  }
+  return true;
+}

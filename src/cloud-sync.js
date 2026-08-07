@@ -1,7 +1,7 @@
 /**
  * 云端同步模块 - 通过 Supabase 实现用户账号云端存储
  */
-import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured } from './supabase-client';
+import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, loadStats, saveStats } from './supabase-client';
 
 /**
  * 从云端加载配方
@@ -76,6 +76,36 @@ export async function deleteFavoriteFromCloud(favoriteId) {
     return await deleteFavorite(favoriteId);
   } catch (e) {
     console.warn('Failed to delete favorite from cloud:', e);
+  }
+  return false;
+}
+
+/**
+ * 从云端加载统计
+ */
+export async function loadStatsFromCloud() {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return null;
+    return await loadStats();
+  } catch (e) {
+    console.warn('Failed to load stats from cloud:', e);
+  }
+  return null;
+}
+
+/**
+ * 保存统计到云端
+ */
+export async function saveStatsToCloud(copiedCount) {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return false;
+    return await saveStats(copiedCount);
+  } catch (e) {
+    console.warn('Failed to save stats to cloud:', e);
   }
   return false;
 }

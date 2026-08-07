@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
+import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, loadStatsFromCloud, saveStatsToCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -90,7 +90,8 @@ function App() {
     Promise.all([
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
-    ]).then(([cloudRecipes, cloudFavorites]) => {
+      loadStatsFromCloud(),
+    ]).then(([cloudRecipes, cloudFavorites, cloudStats]) => {
       // 合并配方
       if (cloudRecipes && cloudRecipes.length > 0) {
         try {
@@ -126,6 +127,18 @@ function App() {
           setFavoriteIds(merged);
         } catch (e) {
           setFavoriteIds(cloudFavorites);
+        }
+      }
+
+      // 合并统计
+      if (cloudStats) {
+        try {
+          const localRaw = localStorage.getItem('my_ai_copied_count_v1');
+          const localCount = localRaw ? parseInt(localRaw, 10) : 0;
+          const mergedCount = Math.max(cloudStats.copied_count || 0, localCount);
+          setCopiedCount(mergedCount);
+        } catch (e) {
+          // ignore
         }
       }
     });
@@ -164,6 +177,8 @@ function App() {
     } catch (e) {
       // ignore
     }
+    // 同步到云端
+    saveStatsToCloud(copiedCount).catch(() => {});
   }, [copiedCount]);
 
   useEffect(() => {
