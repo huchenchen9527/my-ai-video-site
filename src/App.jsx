@@ -590,7 +590,7 @@ function App() {
             filteredPrompts.map((prompt) => {
               const cardId = getPromptId(prompt);
               const isCopied = copiedId === cardId;
-              const canFavorite = !prompt.draft || prompt.saved;
+              const canFavorite = prompt.saved === true;
 
               return (
                 <article
