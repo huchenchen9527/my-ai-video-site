@@ -332,21 +332,7 @@ function App() {
 
   const updateRecipeField = (id, field, value) => {
     setRecipe((prev) => {
-      const updated = prev.map((item) => (item.id === id ? { ...item, [field]: value } : item));
-      // Auto-save custom recipes when title or content changes
-      if (field === 'title' || field === 'content') {
-        const changedItem = updated.find((item) => item.id === id);
-        if (changedItem && changedItem.custom && changedItem.content && changedItem.content.trim()) {
-          const autoSaved = updated.map((item) => {
-            if (item.id === id && !item.saved) {
-              return { ...item, saved: true, draft: false };
-            }
-            return item;
-          });
-          return autoSaved;
-        }
-      }
-      return updated;
+      return prev.map((item) => (item.id === id ? { ...item, [field]: value } : item));
     });
   };
 
