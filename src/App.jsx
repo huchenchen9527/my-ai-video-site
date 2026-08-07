@@ -383,6 +383,11 @@ function App() {
     });
   };
 
+  // 删除自定义配方（真正从列表中移除）
+  const deleteCustomRecipe = (id) => {
+    setRecipe(prev => prev.filter(p => p.id !== id));
+  };
+
   // ---------- 修改点 5：清空工作台（自定义隐藏，普通删除） ----------
   const clearRecipe = () => {
     setRecipe(prev =>
@@ -646,7 +651,13 @@ function App() {
                           <button
                             onClick={(e) => { e.stopPropagation(); removeFromRecipe(prompt); }}
                             className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300"
-                          >移除</button>
+                          >从工作台移除</button>
+                          {prompt.custom && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这个配方吗？')) deleteCustomRecipe(prompt.id); }}
+                              className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20"
+                            >删除</button>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -661,10 +672,18 @@ function App() {
                             {isCopied ? '已复制' : '复制'}
                           </button>
                           {prompt.saved && !prompt.editing && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); editRecipeCard(prompt.id); }}
-                              className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
-                            >编辑</button>
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); editRecipeCard(prompt.id); }}
+                                className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
+                              >编辑</button>
+                              {prompt.custom && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这个配方吗？')) deleteCustomRecipe(prompt.id); }}
+                                  className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 hover:bg-red-500/20"
+                                >删除</button>
+                              )}
+                            </>
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); addToRecipe(prompt); }}
