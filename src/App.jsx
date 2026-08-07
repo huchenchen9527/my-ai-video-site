@@ -637,9 +637,21 @@ function App() {
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); addToRecipe(prompt); }}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                              recipe.find((p) => {
+                                if (p.custom) {
+                                  return p.id === prompt.id && p.inWorkbench !== false;
+                                }
+                                return p.id === prompt.id || `${p.title}-${p.category}` === cardId;
+                              }) ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                            }`}
                           >
-                            {recipe.find((p) => p.id === prompt.id || `${p.title}-${p.category}` === cardId) ? '已加入配方' : '加入配方'}
+                            {recipe.find((p) => {
+                              if (p.custom) {
+                                return p.id === prompt.id && p.inWorkbench !== false;
+                              }
+                              return p.id === prompt.id || `${p.title}-${p.category}` === cardId;
+                            }) ? '已加入配方' : '加入配方'}
                           </button>
                         </div>
                       </>
