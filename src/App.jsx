@@ -91,8 +91,13 @@ function App() {
           const localRecipes = localRaw ? JSON.parse(localRaw) : [];
 
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
+          // 将数据库字段 in_workbench 映射为 inWorkbench
+          const mappedCloudRecipes = cloudRecipes.map(p => ({
+            ...p,
+            inWorkbench: p.in_workbench !== undefined ? p.in_workbench : (p.custom === true ? false : true),
+          }));
           const merged = [
-            ...cloudRecipes,
+            ...mappedCloudRecipes,
             ...localRecipes.filter(p => {
               const id = p.id || `${p.title}-${p.category}`;
               return !cloudIds.has(id);
@@ -126,12 +131,15 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipe));
+      // 只保存非草稿配方
+      const nonDraftRecipes = recipe.filter(p => !p.draft);
+      localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(nonDraftRecipes));
     } catch (e) {
       // ignore
     }
     // 同步到云端（静默失败，不影响本地体验）
-    saveRecipesToCloud(recipe).catch(() => {});
+    const cloudRecipes = recipe.filter(p => !p.draft);
+    saveRecipesToCloud(cloudRecipes).catch(() => {});
   }, [recipe]);
 
   useEffect(() => {
@@ -156,11 +164,15 @@ function App() {
     return `${prompt.title}-${prompt.category}`;
   };
 
+  // ---------- 修改点 1：过滤逻辑，'配方'只显示自定义配方 ----------
   const filteredPrompts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
 
     if (activeCategory === '配方') {
+      // 只显示自定义配方（custom: true），不显示普通提示词
       return recipe.filter((prompt) => {
+        if (!prompt.custom) return false;           // 只显示自定义
+        if (prompt.draft && !prompt.editing) return false;
         const matchesSearch =
           !query ||
           prompt.title.toLowerCase().includes(query) ||
@@ -244,16 +256,33 @@ function App() {
     }
   };
 
+  // ---------- 修改点 2：加入/移出工作台（区分自定义和普通） ----------
   const addToRecipe = (prompt) => {
     const id = getPromptId(prompt);
     setRecipe((prev) => {
-      if (prev.find((p) => p.id === id)) {
-        return prev.filter((p) => p.id !== id);
+      const existing = prev.find(p => p.id === id);
+      if (existing) {
+        if (existing.custom) {
+          // 自定义配方：切换 inWorkbench
+          return prev.map(p =>
+            p.id === id ? { ...p, inWorkbench: !p.inWorkbench } : p
+          );
+        } else {
+          // 普通提示词：移除
+          return prev.filter(p => p.id !== id);
+        }
+      } else {
+        // 不存在：添加，自定义配方设置 inWorkbench: true
+        const newItem = { ...prompt, id };
+        if (prompt.custom) {
+          newItem.inWorkbench = true;
+        }
+        return [...prev, newItem];
       }
-      return [...prev, { ...prompt, id, category: prompt.category || '配方' }];
     });
   };
 
+  // ---------- 修改点 3：新建自定义配方，默认不加入工作台 ----------
   const createCustomRecipe = () => {
     const newRecipe = {
       id: `custom-${Date.now()}`,
@@ -263,6 +292,8 @@ function App() {
       custom: true,
       editing: true,
       saved: false,
+      draft: true,
+      inWorkbench: false,   // 默认不进入工作台
     };
     setRecipe((prev) => [newRecipe, ...prev]);
     setActiveCategory('配方');
@@ -277,7 +308,7 @@ function App() {
         if (changedItem && changedItem.custom && changedItem.content && changedItem.content.trim()) {
           const autoSaved = updated.map((item) => {
             if (item.id === id && !item.saved) {
-              return { ...item, saved: true };
+              return { ...item, saved: true, draft: false };
             }
             return item;
           });
@@ -293,7 +324,7 @@ function App() {
       prev.map((item) => {
         if (item.id !== id) return item;
         if (!item.content || !item.content.trim()) return item;
-        return { ...item, editing: false, saved: true };
+        return { ...item, editing: false, saved: true, draft: false };
       })
     );
   };
@@ -306,16 +337,40 @@ function App() {
     );
   };
 
+  // ---------- 修改点 4：从工作台移除（自定义只隐藏，普通删除） ----------
   const removeFromRecipe = (prompt) => {
     const id = getPromptId(prompt);
-    setRecipe((prev) => prev.filter((p) => p.id !== id));
+    setRecipe(prev => {
+      const existing = prev.find(p => p.id === id);
+      if (existing && existing.custom) {
+        // 自定义配方：仅隐藏，不删除
+        return prev.map(p => p.id === id ? { ...p, inWorkbench: false } : p);
+      } else {
+        // 普通项：删除
+        return prev.filter(p => p.id !== id);
+      }
+    });
   };
 
-  const clearRecipe = () => setRecipe([]);
+  // ---------- 修改点 5：清空工作台（自定义隐藏，普通删除） ----------
+  const clearRecipe = () => {
+    setRecipe(prev =>
+      prev
+        .map(item => {
+          if (item.custom) {
+            return { ...item, inWorkbench: false };
+          }
+          return null; // 普通项标记为删除
+        })
+        .filter(Boolean)
+    );
+  };
 
+  // ---------- 修改点 6：组合复制只复制工作台可见项 ----------
   const copyCombinedRecipe = async () => {
-    if (recipe.length === 0) return;
-    const combined = recipe.map((p) => p.content).join('\n\n-----\n\n');
+    const workbenchItems = recipe.filter(item => item.inWorkbench !== false);
+    if (workbenchItems.length === 0) return;
+    const combined = workbenchItems.map((p) => p.content).join('\n\n-----\n\n');
     await handleCopy(combined, `combined-${Date.now()}`);
   };
 
@@ -615,12 +670,13 @@ function App() {
             ))}
           </div>
         </section>
-        {recipe.length > 0 && (
+
+        {recipe.filter(item => item.inWorkbench !== false).length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 overflow-x-auto pl-1">
                 <span className="text-sm text-slate-300">工作台：</span>
-                {recipe.map((p) => {
+                {recipe.filter(item => item.inWorkbench !== false).map((p) => {
                   const id = `${p.title}-${p.category}`;
                   return (
                     <div key={id} className="flex items-center gap-2 rounded-md border border-white/5 bg-white/3 px-3 py-2 text-sm text-slate-200">
@@ -637,10 +693,12 @@ function App() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={copyCombinedRecipe}
-                  disabled={recipe.length < 2}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
+                  disabled={recipe.filter(item => item.inWorkbench !== false).length < 2}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${recipe.filter(item => item.inWorkbench !== false).length >= 2 ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-slate-400 opacity-40 cursor-not-allowed'}`}
                 >
-                  {recipe.length >= 2 ? `复制组合配方 (${recipe.length})` : '至少两个可组合'}
+                  {recipe.filter(item => item.inWorkbench !== false).length >= 2
+                    ? `复制组合配方 (${recipe.filter(item => item.inWorkbench !== false).length})`
+                    : '至少两个可组合'}
                 </button>
                 <button
                   onClick={() => clearRecipe()}

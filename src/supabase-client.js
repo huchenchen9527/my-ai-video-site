@@ -84,6 +84,7 @@ export async function saveRecipes(recipes) {
     category: recipe.category || '配方',
     custom: recipe.custom || false,
     saved: recipe.saved || false,
+    in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }));

@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/supabase': {
-        target: 'https://uspynsimapaywviylbdh.supabase.co',
+        target: 'https://uspynsimapaywviyldbh.supabase.co',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/supabase/, '')
       }
