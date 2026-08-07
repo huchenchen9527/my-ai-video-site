@@ -59,7 +59,14 @@ function App() {
   });
   const [videoError, setVideoError] = useState(false);
   const [categoryPinned, setCategoryPinned] = useState(false);
-  const [copiedCount, setCopiedCount] = useState(0);
+  const [copiedCount, setCopiedCount] = useState(() => {
+    try {
+      const raw = localStorage.getItem('my_ai_copied_count_v1');
+      return raw ? parseInt(raw, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [recipe, setRecipe] = useState(() => {
     try {
       const raw = localStorage.getItem('my_ai_recipes_v1');
@@ -127,6 +134,7 @@ function App() {
     RECIPES: 'my_ai_recipes_v1',
     FAVORITES: 'my_ai_favorites_v1',
     ACTIVE_CATEGORY: 'my_ai_active_category_v1',
+    COPIED_COUNT: 'my_ai_copied_count_v1',
   };
 
   useEffect(() => {
@@ -149,6 +157,14 @@ function App() {
       // ignore
     }
   }, [favoriteIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.COPIED_COUNT, String(copiedCount));
+    } catch (e) {
+      // ignore
+    }
+  }, [copiedCount]);
 
   useEffect(() => {
     setCategoryHash(activeCategory);
