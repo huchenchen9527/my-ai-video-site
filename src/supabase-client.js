@@ -61,7 +61,10 @@ export async function loadRecipes() {
     console.warn('Failed to load recipes:', error);
     return null;
   }
-  return data || [];
+  return (data || []).map(r => ({
+    ...r,
+    inWorkbench: r.in_workbench !== undefined ? r.in_workbench : true,
+  }));
 }
 
 // 保存配方列表（使用 upsert 替代先删后插，避免数据丢失）
