@@ -588,6 +588,12 @@ function App() {
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
                   <div className="relative flex h-full flex-col">
+                    {isCustomRecipe && prompt.saved && (
+                      <div className="absolute right-10 top-3 flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        已同步
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-400/90">{prompt.category}</p>
