@@ -82,8 +82,8 @@ function App() {
   const { userEmail, handleLogin, handleLogout } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // 从云端加载配方和收藏（如果有云端数据，合并到本地）
-  // 当用户登录状态变化（userEmail 变化）时重新同步
+  // 从云端加载配方和收藏（以云端为权威源）
+  // 每次用户登录后都重新同步，确保删除操作生效
   useEffect(() => {
     if (!userEmail) return; // 未登录时不执行云端同步
 
@@ -91,37 +91,43 @@ function App() {
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
     ]).then(([cloudRecipes, cloudFavorites]) => {
-      // 合并配方
-      if (cloudRecipes && cloudRecipes.length > 0) {
-        try {
-          const localRaw = localStorage.getItem('my_ai_recipes_v1');
-          const localRecipes = localRaw ? JSON.parse(localRaw) : [];
+      // 以云端配方为准，合并本地未保存的新配方
+      try {
+        const localRaw = localStorage.getItem('my_ai_recipes_v1');
+        const localRecipes = localRaw ? JSON.parse(localRaw) : [];
 
+        if (cloudRecipes && cloudRecipes.length > 0) {
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
-          const merged = [
-            ...cloudRecipes,
-            ...localRecipes.filter(p => {
-              const id = p.id || `${p.title}-${p.category}`;
-              return !cloudIds.has(id);
-            }),
-          ];
-          setRecipe(merged);
-        } catch (e) {
-          setRecipe(cloudRecipes);
+          // 只保留本地有但云端没有的新配方（尚未同步）
+          const unsynced = localRecipes.filter(p => {
+            const id = p.id || `${p.title}-${p.category}`;
+            return !cloudIds.has(id);
+          });
+          setRecipe([...cloudRecipes, ...unsynced]);
+        } else if (localRecipes.length > 0) {
+          // 云端没有数据，使用本地的
+          setRecipe(localRecipes);
         }
+      } catch (e) {
+        if (cloudRecipes) setRecipe(cloudRecipes);
       }
 
-      // 合并收藏
+      // 以云端收藏为准，合并本地未同步的
       if (cloudFavorites && cloudFavorites.length > 0) {
         try {
           const localRaw = localStorage.getItem('my_ai_favorites_v1');
           const localFavorites = localRaw ? JSON.parse(localRaw) : [];
-
           const merged = Array.from(new Set([...cloudFavorites, ...localFavorites]));
           setFavoriteIds(merged);
         } catch (e) {
           setFavoriteIds(cloudFavorites);
         }
+      } else {
+        try {
+          const localRaw = localStorage.getItem('my_ai_favorites_v1');
+          const localFavorites = localRaw ? JSON.parse(localRaw) : [];
+          if (localFavorites.length > 0) setFavoriteIds(localFavorites);
+        } catch (e) {}
       }
     });
   }, [userEmail]);

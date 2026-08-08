@@ -63,7 +63,7 @@ export async function loadRecipes() {
   }
   return (data || []).map(r => ({
     ...r,
-    inWorkbench: r.in_workbench !== undefined ? r.in_workbench : true,
+    inWorkbench: r.in_workbench !== undefined && r.in_workbench !== null ? r.in_workbench : false,
   }));
 }
 
@@ -92,7 +92,7 @@ export async function saveRecipes(recipes) {
       category: recipe.category || '配方',
       custom: recipe.custom || false,
       saved: recipe.saved || false,
-      in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : true,
+      in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : false,
       updated_at: new Date().toISOString(),
     };
   });
