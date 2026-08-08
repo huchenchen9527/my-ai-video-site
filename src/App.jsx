@@ -138,8 +138,9 @@ function App() {
     } catch (e) {
       // ignore
     }
-    // 同步到云端（静默失败，不影响本地体验）
-    saveRecipesToCloud(recipe).catch(() => {});
+    // 只同步自定义配方到云端（静默失败，不影响本地体验）
+    const customRecipes = recipe.filter(p => p.custom === true);
+    saveRecipesToCloud(customRecipes).catch(() => {});
   }, [recipe]);
 
   useEffect(() => {
@@ -177,6 +178,8 @@ function App() {
 
     if (activeCategory === '配方') {
       return recipe.filter((prompt) => {
+        // 只展示自定义配方卡片（有内容的已保存配方）
+        if (!prompt.custom) return false;
         const matchesSearch =
           !query ||
           prompt.title.toLowerCase().includes(query) ||
