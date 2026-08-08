@@ -64,36 +64,59 @@ export async function loadRecipes() {
   return data || [];
 }
 
-// 保存配方列表（全量覆盖）
+// 保存配方列表（使用 upsert 替代先删后插，避免数据丢失）
 export async function saveRecipes(recipes) {
   if (!supabase) return false;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
-  // 先删除用户所有旧配方
-  await supabase.from('recipes').delete().eq('user_id', user.id);
+  // 获取云端现有配方 ID 集合
+  const { data: existing } = await supabase
+    .from('recipes')
+    .select('id')
+    .eq('user_id', user.id);
 
-  if (!recipes || recipes.length === 0) return true;
+  const existingIds = new Set((existing || []).map(r => r.id));
 
-  // 批量插入新配方
-  const records = recipes.map(recipe => ({
-    id: recipe.id || `${recipe.title}-${recipe.category}`,
-    user_id: user.id,
-    title: recipe.title,
-    content: recipe.content || '',
-    category: recipe.category || '配方',
-    custom: recipe.custom || false,
-    saved: recipe.saved || false,
-    in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }));
+  // 构建新配方 ID 集合
+  const newRecords = (recipes || []).map(recipe => {
+    const id = recipe.id || `${recipe.title}-${recipe.category}`;
+    return {
+      id,
+      user_id: user.id,
+      title: recipe.title,
+      content: recipe.content || '',
+      category: recipe.category || '配方',
+      custom: recipe.custom || false,
+      saved: recipe.saved || false,
+      in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : true,
+      updated_at: new Date().toISOString(),
+    };
+  });
 
-  const { error } = await supabase.from('recipes').insert(records);
+  const newIds = new Set(newRecords.map(r => r.id));
 
-  if (error) {
-    console.warn('Failed to save recipes:', error);
-    return false;
+  // 删除云端有但本地不存在的配方（用户已删除的）
+  const toDelete = [...existingIds].filter(id => !newIds.has(id));
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('recipes')
+      .delete()
+      .eq('user_id', user.id)
+      .in('id', toDelete);
+    if (delErr) console.warn('Failed to delete removed recipes:', delErr);
+  }
+
+  // 使用 upsert 批量插入或更新
+  if (newRecords.length > 0) {
+    const { error } = await supabase
+      .from('recipes')
+      .upsert(newRecords, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Failed to save recipes:', error);
+      return false;
+    }
   }
   return true;
 }
@@ -126,7 +149,7 @@ export async function saveFavorite(favorite) {
 
   const { error } = await supabase
     .from('favorites')
-    .upsert({ id, user_id: user.id, prompt_title, prompt_category, prompt_content });
+    .upsert({ id, user_id: user.id, prompt_title, prompt_category, prompt_content }, { onConflict: 'id' });
 
   if (error) console.warn('Failed to save favorite:', id);
   return !error;
