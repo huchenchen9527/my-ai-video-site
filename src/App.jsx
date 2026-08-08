@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
+import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -342,6 +342,8 @@ function App() {
 
   const removeFromRecipe = (prompt) => {
     const id = getPromptId(prompt);
+    // 先从云端删除
+    deleteRecipeFromCloud(id).catch(() => {});
     setRecipe((prev) => prev.filter((p) => p.id !== id));
   };
 

@@ -110,6 +110,28 @@ export async function saveStatsToCloud(copiedCount) {
   return false;
 }
 
+/**
+ * 删除云端单个配方
+ */
+export async function deleteRecipeFromCloud(recipeId) {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return false;
+    const { supabase } = await import('./supabase-client');
+    if (!supabase) return false;
+    const { error } = await supabase
+      .from('recipes')
+      .delete()
+      .eq('id', recipeId)
+      .eq('user_id', user.id);
+    return !error;
+  } catch (e) {
+    console.warn('Failed to delete recipe from cloud:', e);
+  }
+  return false;
+}
+
 export function isCloudConfigured() {
   return isSupabaseConfigured();
 }
