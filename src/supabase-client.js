@@ -101,13 +101,18 @@ export async function saveRecipes(recipes) {
 
   // 删除云端有但本地不存在的配方（用户已删除的）
   const toDelete = [...existingIds].filter(id => !newIds.has(id));
+  console.log('[saveRecipes] existingIds:', [...existingIds], 'newIds:', [...newIds], 'toDelete:', toDelete);
   if (toDelete.length > 0) {
     const { error: delErr } = await supabase
       .from('recipes')
       .delete()
       .eq('user_id', user.id)
       .in('id', toDelete);
-    if (delErr) console.warn('Failed to delete removed recipes:', delErr);
+    if (delErr) {
+      console.warn('[saveRecipes] Failed to delete removed recipes:', delErr, 'IDs:', toDelete);
+    } else {
+      console.log('[saveRecipes] Successfully deleted recipes:', toDelete);
+    }
   }
 
   // 使用 upsert 批量插入或更新

@@ -721,7 +721,7 @@ function App() {
         {workbenchItems.length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 flex-shrink-0 items-center gap-3 overflow-x-auto pl-1">
+              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pl-1">
                 <span className="flex-shrink-0 text-sm text-slate-300 whitespace-nowrap">工作台：</span>
                 {workbenchItems.map((p) => {
                   const id = `${p.title}-${p.category}`;
