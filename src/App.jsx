@@ -673,7 +673,7 @@ function App() {
                               className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
                             >编辑</button>
                           )}
-                          {isCustomRecipe && prompt.saved !== false && (
+                          {isCustomRecipe && (
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); removeFromRecipe(prompt); }}
