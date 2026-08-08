@@ -76,7 +76,6 @@ function App() {
       return [];
     }
   });
-  const [cloudSynced, setCloudSynced] = useState(false);
   const promptsRef = useRef(prompts);
 
   // Auth
@@ -84,9 +83,9 @@ function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // 从云端加载配方和收藏（如果有云端数据，合并到本地）
+  // 当用户登录状态变化（userEmail 变化）时重新同步
   useEffect(() => {
-    if (cloudSynced) return;
-    setCloudSynced(true);
+    if (!userEmail) return; // 未登录时不执行云端同步
 
     Promise.all([
       loadRecipesFromCloud(),
@@ -125,7 +124,7 @@ function App() {
         }
       }
     });
-  }, [cloudSynced]);
+  }, [userEmail]);
   const STORAGE_KEYS = {
     RECIPES: 'my_ai_recipes_v1',
     WORKBENCH: 'my_ai_workbench_v1',
