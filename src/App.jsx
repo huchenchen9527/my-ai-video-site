@@ -90,7 +90,7 @@ function App() {
     Promise.all([
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
-    ]).then(([cloudRecipes, cloudFavorites]) => {
+    ]).then(async ([cloudRecipes, cloudFavorites]) => {
       // 以云端配方为准，合并本地未保存的新配方
       try {
         const localRaw = localStorage.getItem('my_ai_recipes_v1');
@@ -98,12 +98,33 @@ function App() {
 
         if (cloudRecipes && cloudRecipes.length > 0) {
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
+          const localIds = new Set(localRecipes.map(p => p.id || `${p.title}-${p.category}`));
+          
+          // 云端有但本地没有的配方（已被用户删除），从云端删除
+          const toDelete = cloudRecipes.filter(p => {
+            const id = p.id || `${p.title}-${p.category}`;
+            return !localIds.has(id);
+          });
+          
+          // 过滤掉要删除的配方
+          const filteredCloudRecipes = cloudRecipes.filter(p => {
+            const id = p.id || `${p.title}-${p.category}`;
+            return localIds.has(id);
+          });
+          
+          if (toDelete.length > 0) {
+            console.log('[login-sync] Deleting cloud recipes not in local:', toDelete.map(p => p.id));
+            for (const recipe of toDelete) {
+              await deleteRecipeFromCloud(recipe.id || `${recipe.title}-${recipe.category}`);
+            }
+          }
+          
           // 只保留本地有但云端没有的新配方（尚未同步）
           const unsynced = localRecipes.filter(p => {
             const id = p.id || `${p.title}-${p.category}`;
             return !cloudIds.has(id);
           });
-          setRecipe([...cloudRecipes, ...unsynced]);
+          setRecipe([...filteredCloudRecipes, ...unsynced]);
         } else if (localRecipes.length > 0) {
           // 云端没有数据，使用本地的
           setRecipe(localRecipes);
@@ -346,11 +367,12 @@ function App() {
     );
   };
 
-  const removeFromRecipe = (prompt) => {
+  const removeFromRecipe = async (prompt) => {
     const id = getPromptId(prompt);
-    // 先从云端删除
-    deleteRecipeFromCloud(id).catch(() => {});
     setRecipe((prev) => prev.filter((p) => p.id !== id));
+    // 从云端删除（异步不阻塞 UI）
+    deleteRecipeFromCloud(id).catch(() => {});
+    // 同时触发 saveRecipesToCloud 也会执行云端有但本地没有的删除操作，双重保障
   };
 
   const removeFromWorkbench = (prompt) => {
@@ -699,8 +721,8 @@ function App() {
         {workbenchItems.length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 overflow-x-auto pl-1">
-                <span className="text-sm text-slate-300">工作台：</span>
+              <div className="flex min-w-0 flex-shrink-0 items-center gap-3 overflow-x-auto pl-1">
+                <span className="flex-shrink-0 text-sm text-slate-300 whitespace-nowrap">工作台：</span>
                 {workbenchItems.map((p) => {
                   const id = `${p.title}-${p.category}`;
                   return (
@@ -715,7 +737,7 @@ function App() {
                 })}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-shrink-0 items-center gap-2">
                 <button
                   onClick={copyCombinedRecipe}
                   disabled={workbenchItems.length < 2}
