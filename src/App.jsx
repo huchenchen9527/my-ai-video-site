@@ -100,31 +100,36 @@ function App() {
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
           const localIds = new Set(localRecipes.map(p => p.id || `${p.title}-${p.category}`));
           
-          // 云端有但本地没有的配方（已被用户删除），从云端删除
-          const toDelete = cloudRecipes.filter(p => {
-            const id = p.id || `${p.title}-${p.category}`;
-            return !localIds.has(id);
-          });
-          
-          // 过滤掉要删除的配方
-          const filteredCloudRecipes = cloudRecipes.filter(p => {
-            const id = p.id || `${p.title}-${p.category}`;
-            return localIds.has(id);
-          });
-          
-          if (toDelete.length > 0) {
-            console.log('[login-sync] Deleting cloud recipes not in local:', toDelete.map(p => p.id));
-            for (const recipe of toDelete) {
-              await deleteRecipeFromCloud(recipe.id || `${recipe.title}-${recipe.category}`);
+          // 本地为空时直接使用云端数据（刚登录场景）
+          if (localRecipes.length === 0) {
+            setRecipe(cloudRecipes);
+          } else {
+            // 云端有但本地没有的配方（已被用户删除），从云端删除
+            const toDelete = cloudRecipes.filter(p => {
+              const id = p.id || `${p.title}-${p.category}`;
+              return !localIds.has(id);
+            });
+            
+            // 过滤掉要删除的配方
+            const filteredCloudRecipes = cloudRecipes.filter(p => {
+              const id = p.id || `${p.title}-${p.category}`;
+              return localIds.has(id);
+            });
+            
+            if (toDelete.length > 0) {
+              console.log('[login-sync] Deleting cloud recipes not in local:', toDelete.map(p => p.id));
+              for (const recipe of toDelete) {
+                await deleteRecipeFromCloud(recipe.id || `${recipe.title}-${recipe.category}`);
+              }
             }
+            
+            // 只保留本地有但云端没有的新配方（尚未同步）
+            const unsynced = localRecipes.filter(p => {
+              const id = p.id || `${p.title}-${p.category}`;
+              return !cloudIds.has(id);
+            });
+            setRecipe([...filteredCloudRecipes, ...unsynced]);
           }
-          
-          // 只保留本地有但云端没有的新配方（尚未同步）
-          const unsynced = localRecipes.filter(p => {
-            const id = p.id || `${p.title}-${p.category}`;
-            return !cloudIds.has(id);
-          });
-          setRecipe([...filteredCloudRecipes, ...unsynced]);
         } else if (localRecipes.length > 0) {
           // 云端没有数据，使用本地的
           setRecipe(localRecipes);
