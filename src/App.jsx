@@ -77,7 +77,6 @@ function App() {
     }
   });
   const promptsRef = useRef(prompts);
-  const [cloudSyncing, setCloudSyncing] = useState(false);
 
   // Auth
   const { userEmail, handleLogin, handleLogout } = useAuth();
@@ -155,11 +154,8 @@ function App() {
     }
     // 只同步自定义配方到云端（静默失败，不影响本地体验）
     const customRecipes = recipe.filter(p => p.custom === true);
-    if (customRecipes.length > 0 && userEmail) {
-      setCloudSyncing(true);
-      saveRecipesToCloud(customRecipes).finally(() => setCloudSyncing(false));
-    }
-  }, [recipe, userEmail]);
+    saveRecipesToCloud(customRecipes).catch(() => {});
+  }, [recipe]);
 
   useEffect(() => {
     try {
@@ -564,21 +560,6 @@ function App() {
                 </div>
               </div>
             )}
-            {activeCategory === '配方' && userEmail && (
-              <div className="col-span-2 rounded-xl border border-white/10 bg-white/5 p-4 sm:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs ${cloudSyncing ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                      <span className={`h-2 w-2 rounded-full ${cloudSyncing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
-                      {cloudSyncing ? '正在同步到云端...' : '已同步到云端'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {recipe.filter(p => p.custom === true).length} 个配方
-                  </div>
-                </div>
-              </div>
-            )}
             {activeCategory === '配方' && (
               <button
                 type="button"
@@ -603,7 +584,6 @@ function App() {
               return (
                 <article
                   key={prompt.id || cardId}
-                  
                   className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition duration-200 hover:-translate-y-1 hover:border-amber-400/40"
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
@@ -613,14 +593,7 @@ function App() {
                         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-400/90">{prompt.category}</p>
                         <h2 className="mt-2 text-lg font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis">{prompt.title}</h2>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isCustomRecipe && userEmail && (
-                          <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${cloudSyncing ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${cloudSyncing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
-                            {cloudSyncing ? '同步中' : '已同步'}
-                          </span>
-                        )}
-                        <button
+                      <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); if (canFavorite) toggleFavorite(prompt); }}
                         disabled={!canFavorite}
