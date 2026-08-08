@@ -708,27 +708,25 @@ function App() {
         {workbenchItems.length > 0 && (
           <div className="fixed left-1/2 bottom-4 z-50 w-[calc(100%-1.5rem)] -translate-x-1/2 max-w-5xl rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pl-1">
+              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-scroll scrollbar-hide pl-1">
                 <span className="flex-shrink-0 text-sm text-slate-300 whitespace-nowrap">工作台：</span>
                 {workbenchItems.map((p) => {
                   const id = `${p.title}-${p.category}`;
                   return (
                     <div
                       key={id}
-                      className="group relative flex items-center gap-2 rounded-md border border-white/5 bg-white/3 px-3 py-2 text-sm text-slate-200"
+                      className="group relative flex-shrink-0 flex items-center gap-2 rounded-md border border-white/5 bg-white/3 px-3 py-2 text-sm text-slate-200"
                     >
                       <div className="max-w-[220px] truncate">{p.title}</div>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeFromWorkbench(p); }}
                         className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300"
                       >移除</button>
-                      {p.content && (
-                        <div className="invisible absolute bottom-full left-1/2 z-[60] mb-2 -translate-x-1/2 w-72 rounded-lg border border-white/10 bg-gray-900/95 p-3 text-xs text-slate-300 opacity-0 shadow-xl backdrop-blur-sm group-hover:visible group-hover:opacity-100">
-                          <div className="mb-1 font-semibold text-white">{p.title}</div>
-                          <div className="whitespace-pre-wrap break-words">{p.content}</div>
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full h-0 w-0 border-x-4 border-t-4 border-x-transparent border-t-gray-900/95" />
-                        </div>
-                      )}
+                      <div className="invisible absolute bottom-full left-1/2 z-[60] mb-2 -translate-x-1/2 w-72 rounded-lg border border-white/10 bg-gray-900/95 p-3 text-xs text-slate-300 opacity-0 shadow-xl backdrop-blur-sm group-hover:visible group-hover:opacity-100">
+                        <div className="mb-1 font-semibold text-white">{p.title}</div>
+                        <div className="whitespace-pre-wrap break-words">{p.content || '(无内容)'}</div>
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full h-0 w-0 border-x-4 border-t-4 border-x-transparent border-t-gray-900/95" />
+                      </div>
                     </div>
                   );
                 })}

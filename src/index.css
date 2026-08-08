@@ -35,3 +35,12 @@ button,
 input {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* 隐藏滚动条 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
