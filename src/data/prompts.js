@@ -653,16 +653,6 @@ export const prompts = [
     content: '加入合成音效与氛围层，建立一种未来感、科技感与情绪延展感。',
   },
   {
-    title: '逆光人物 silhouette',
-    category: '灯光技巧',
-    content: '使用强烈逆光把人物轮廓压成黑色剪影，突出情绪与故事感。',
-  },
-  {
-    title: '柔焦情绪氛围',
-    category: '灯光技巧',
-    content: '通过柔焦与暖光混合，让画面更像记忆片段，柔软而有情绪起伏。',
-  },
-  {
     title: '霓虹冷蓝色彩',
     category: '色彩美学',
     content: '用冷蓝霓虹和黑色底色构成都市夜景，强化未来科技感。',
