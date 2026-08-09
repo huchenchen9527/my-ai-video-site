@@ -92,65 +92,6 @@ export async function loadRecipes() {
   }));
 }
 
-// 保存配方列表（upsert + 删除云端有但本地没有的配方）
-export async function saveRecipes(recipes) {
-  if (!supabase) return false;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  // 获取云端现有配方 ID 集合
-  const { data: existing } = await supabase
-    .from('recipes')
-    .select('id')
-    .eq('user_id', user.id);
-
-  const existingIds = new Set((existing || []).map(r => r.id));
-
-  // 构建新配方记录
-  const newRecords = (recipes || []).map(recipe => {
-    const id = recipe.id || `${recipe.title}-${recipe.category}`;
-    return {
-      id,
-      user_id: user.id,
-      title: recipe.title,
-      content: recipe.content || '',
-      category: recipe.category || '配方',
-      custom: recipe.custom || false,
-      saved: recipe.saved || false,
-      in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : false,
-      updated_at: new Date().toISOString(),
-    };
-  });
-
-  const newIds = new Set(newRecords.map(r => r.id));
-
-  // 删除云端有但本地不存在的配方（用户已在本地删除）
-  const toDelete = [...existingIds].filter(id => !newIds.has(id));
-  if (toDelete.length > 0) {
-    const { error: delErr } = await supabase
-      .from('recipes')
-      .delete()
-      .eq('user_id', user.id)
-      .in('id', toDelete);
-    if (delErr) {
-      console.warn('[saveRecipes] Failed to delete removed recipes:', delErr);
-    }
-  }
-
-  // 使用 upsert 批量插入或更新
-  if (newRecords.length > 0) {
-    const { error } = await supabase
-      .from('recipes')
-      .upsert(newRecords, { onConflict: 'id' });
-
-    if (error) {
-      console.warn('Failed to save recipes:', error);
-      return false;
-    }
-  }
-  return true;
-}
-
 // 保存单条配方到云端（上传功能）
 export async function uploadRecipe(recipe) {
   if (!supabase) return false;
@@ -227,45 +168,4 @@ export async function deleteFavorite(id) {
     .eq('user_id', user.id);
 
   return !error;
-}
-
-// 加载用户统计
-export async function loadStats() {
-  if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from('user_stats')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null; // 没有记录
-    console.warn('Failed to load stats:', error);
-    return null;
-  }
-  return data;
-}
-
-// 保存用户统计到云端
-export async function saveStats(copiedCount) {
-  if (!supabase) return false;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { error } = await supabase
-    .from('user_stats')
-    .upsert({
-      user_id: user.id,
-      copied_count: copiedCount,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' });
-
-  if (error) {
-    console.warn('Failed to save stats:', error);
-    return false;
-  }
-  return true;
 }

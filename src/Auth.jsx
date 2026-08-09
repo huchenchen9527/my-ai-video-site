@@ -165,11 +165,6 @@ export function UserMenu({ userEmail, onLogout, onLogin }) {
   );
 }
 
-function AuthStatus({ userEmail, onLogin, onLogout }) {
-  if (!isSupabaseConfigured()) return null;
-  return <UserMenu userEmail={userEmail} onLogin={onLogin} onLogout={onLogout} />;
-}
-
 export function useAuth() {
   const [userEmail, setUserEmail] = useState(() => {
     try {

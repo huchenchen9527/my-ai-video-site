@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud } from './cloud-sync';
+import { loadRecipesFromCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -30,20 +30,6 @@ function setCategoryHash(category) {
     window.location.hash = category;
   }
 }
-
-const categoryIcons = {
-  '景别设计': '🎬',
-  '灯光技巧': '💡',
-  '构图艺术': '🖼️',
-  '镜头运动': '🎥',
-  '色彩美学': '🎨',
-  '镜头光学': '🔍',
-  '质感胶片': '📽️',
-  '风格类别': '✨',
-  '转场类型': '🔄',
-  '音频设计': '🎵',
-  '配方': '🧩',
-};
 
 function App() {
   const [activeCategory, setActiveCategory] = useState(getInitialCategory);
