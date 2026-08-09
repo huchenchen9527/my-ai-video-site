@@ -162,9 +162,13 @@ function App() {
       try {
         const cloudRecipes = await loadRecipesFromCloud();
         if (cloudRecipes) {
-          // 以云端为权威源，标记为已上传
+          // 标记云端配方为已上传
           const uploadedRecipes = cloudRecipes.map(p => ({ ...p, uploaded: true }));
-          setRecipe(uploadedRecipes);
+          // 合并本地未上传的配方（uploaded 为 false 或 undefined）
+          setRecipe((prev) => {
+            const localUnsynced = prev.filter(p => p.custom && !p.uploaded);
+            return [...uploadedRecipes, ...localUnsynced];
+          });
         }
       } catch (e) {
         console.warn('[realtime-sync] Failed to refresh recipes:', e);
