@@ -367,9 +367,7 @@ function App() {
   const removeFromRecipe = async (prompt) => {
     const id = getPromptId(prompt);
     setRecipe((prev) => prev.filter((p) => p.id !== id));
-    // 从云端删除（异步不阻塞 UI）
-    deleteRecipeFromCloud(id).catch(() => {});
-    // 同时触发 saveRecipesToCloud 也会执行云端有但本地没有的删除操作，双重保障
+    // saveRecipesToCloud 会自动删除云端有但本地没有的配方，无需额外调用 deleteRecipeFromCloud
   };
 
   const removeFromWorkbench = (prompt) => {

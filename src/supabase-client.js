@@ -67,11 +67,19 @@ export async function loadRecipes() {
   }));
 }
 
-// 保存配方列表（只做 upsert，不删除云端其他配方）
+// 保存配方列表（upsert + 删除云端有但本地没有的配方）
 export async function saveRecipes(recipes) {
   if (!supabase) return false;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
+
+  // 获取云端现有配方 ID 集合
+  const { data: existing } = await supabase
+    .from('recipes')
+    .select('id')
+    .eq('user_id', user.id);
+
+  const existingIds = new Set((existing || []).map(r => r.id));
 
   // 构建新配方记录
   const newRecords = (recipes || []).map(recipe => {
@@ -89,7 +97,22 @@ export async function saveRecipes(recipes) {
     };
   });
 
-  // 使用 upsert 批量插入或更新（不删除云端其他配方）
+  const newIds = new Set(newRecords.map(r => r.id));
+
+  // 删除云端有但本地不存在的配方（用户已在本地删除）
+  const toDelete = [...existingIds].filter(id => !newIds.has(id));
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('recipes')
+      .delete()
+      .eq('user_id', user.id)
+      .in('id', toDelete);
+    if (delErr) {
+      console.warn('[saveRecipes] Failed to delete removed recipes:', delErr);
+    }
+  }
+
+  // 使用 upsert 批量插入或更新
   if (newRecords.length > 0) {
     const { error } = await supabase
       .from('recipes')
