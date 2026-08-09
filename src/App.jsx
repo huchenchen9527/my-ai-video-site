@@ -82,6 +82,15 @@ function App() {
   const { userEmail, handleLogin, handleLogout } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
+  // 当退出登录时清空本地 state
+  useEffect(() => {
+    if (!userEmail) {
+      setRecipe([]);
+      setFavoriteIds([]);
+      setWorkbench([]);
+    }
+  }, [userEmail]);
+
   // 从云端加载配方和收藏（以云端为权威源）
   // 每次用户登录后都重新同步
   useEffect(() => {

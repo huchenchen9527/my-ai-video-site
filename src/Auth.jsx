@@ -189,7 +189,11 @@ export function useAuth() {
   const handleLogout = useCallback(() => {
     setUserEmail(null);
     try {
+      // 清除用户相关的所有本地数据，防止切换账号时数据混乱
       localStorage.removeItem('my_ai_user_email');
+      localStorage.removeItem('my_ai_recipes_v1');
+      localStorage.removeItem('my_ai_favorites_v1');
+      localStorage.removeItem('my_ai_workbench_v1');
     } catch {}
   }, []);
 
