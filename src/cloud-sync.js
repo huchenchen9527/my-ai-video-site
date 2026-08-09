@@ -1,7 +1,7 @@
 /**
  * 云端同步模块 - 通过 Supabase 实现用户账号云端存储
  */
-import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, loadStats, saveStats, subscribeToRecipes as subscribeToRecipesImpl, unsubscribeFromRecipes as unsubscribeFromRecipesImpl } from './supabase-client';
+import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, loadStats, saveStats, subscribeToRecipes as subscribeToRecipesImpl, unsubscribeFromRecipes as unsubscribeFromRecipesImpl, uploadRecipe as uploadRecipeImpl } from './supabase-client';
 
 /**
  * 从云端加载配方
@@ -149,4 +149,19 @@ export function subscribeToRecipes(onRecipesChanged) {
  */
 export function unsubscribeFromRecipes(channel) {
   unsubscribeFromRecipesImpl(channel);
+}
+
+/**
+ * 上传单条配方到云端（手动上传）
+ */
+export async function uploadRecipeToCloud(recipe) {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return false;
+    return await uploadRecipeImpl(recipe);
+  } catch (e) {
+    console.warn('Failed to upload recipe to cloud:', e);
+  }
+  return false;
 }

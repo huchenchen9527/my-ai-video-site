@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes } from './cloud-sync';
+import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -113,6 +113,9 @@ function App() {
           // 以云端为权威源，合并本地刚创建的新配方
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
           
+          // 云端配方标记为已上传
+          const uploadedCloudRecipes = cloudRecipes.map(p => ({ ...p, uploaded: true }));
+          
           // 本地有但云端没有的新配方（刚创建，尚未同步）
           const unsynced = localRecipes.filter(p => {
             const id = p.id || `${p.title}-${p.category}`;
@@ -120,8 +123,7 @@ function App() {
           });
           
           // 以云端为准 + 本地未同步的新配方
-          // 本地有但云端没有的配方（已被其他设备删除）不会保留
-          const merged = [...cloudRecipes, ...unsynced];
+          const merged = [...uploadedCloudRecipes, ...unsynced];
           setRecipe(merged);
         } else if (localRecipes.length > 0) {
           // 云端没有数据，使用本地的
@@ -160,8 +162,9 @@ function App() {
       try {
         const cloudRecipes = await loadRecipesFromCloud();
         if (cloudRecipes) {
-          // 以云端为权威源，不合并本地数据
-          setRecipe(cloudRecipes);
+          // 以云端为权威源，标记为已上传
+          const uploadedRecipes = cloudRecipes.map(p => ({ ...p, uploaded: true }));
+          setRecipe(uploadedRecipes);
         }
       } catch (e) {
         console.warn('[realtime-sync] Failed to refresh recipes:', e);
@@ -186,11 +189,6 @@ function App() {
     } catch (e) {
       // ignore
     }
-    // Skip cloud sync until initial cloud load completes
-    if (isInitialSyncRef.current) return;
-    // 只同步自定义配方到云端（静默失败，不影响本地体验）
-    const customRecipes = recipe.filter(p => p.custom === true);
-    saveRecipesToCloud(customRecipes).catch(() => {});
   }, [recipe]);
 
   useEffect(() => {
@@ -228,8 +226,9 @@ function App() {
 
     if (activeCategory === '配方') {
       return recipe.filter((prompt) => {
-        // 只展示自定义配方卡片（有内容的已保存配方）
+        // 只展示自定义配方卡片（已保存的配方，含仅本地和已上传）
         if (!prompt.custom) return false;
+        if (!prompt.saved) return false;
         const matchesSearch =
           !query ||
           prompt.title.toLowerCase().includes(query) ||
@@ -377,7 +376,7 @@ function App() {
       prev.map((item) => {
         if (item.id !== id) return item;
         if (!item.content || !item.content.trim()) return item;
-        return { ...item, editing: false, saved: true };
+        return { ...item, editing: false, saved: true, uploaded: false };
       })
     );
   };
@@ -393,7 +392,19 @@ function App() {
   const removeFromRecipe = async (prompt) => {
     const id = getPromptId(prompt);
     setRecipe((prev) => prev.filter((p) => p.id !== id));
-    // saveRecipesToCloud 会自动删除云端有但本地没有的配方，无需额外调用 deleteRecipeFromCloud
+    // 从云端删除
+    deleteRecipeFromCloud(id).catch(() => {});
+  };
+
+  const uploadRecipeToServer = async (id) => {
+    const prompt = recipe.find((p) => p.id === id);
+    if (!prompt || !prompt.content || !prompt.content.trim()) return;
+    const success = await uploadRecipeToCloud(prompt);
+    if (success) {
+      setRecipe((prev) =>
+        prev.map((p) => p.id === id ? { ...p, uploaded: true } : p)
+      );
+    }
   };
 
   const removeFromWorkbench = (prompt) => {
@@ -622,10 +633,16 @@ function App() {
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_45%)] opacity-0 transition duration-200 group-hover:opacity-100" />
                   <div className="relative flex h-full flex-col">
-                    {isCustomRecipe && prompt.saved && (
+                    {isCustomRecipe && prompt.uploaded && (
                       <div className="absolute right-10 top-3 flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
                         已同步
+                      </div>
+                    )}
+                    {isCustomRecipe && !prompt.uploaded && prompt.saved && !prompt.editing && (
+                      <div className="absolute right-10 top-3 flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-300">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        仅本地
                       </div>
                     )}
                     <div className="flex items-start justify-between gap-3">
@@ -698,6 +715,12 @@ function App() {
                               onClick={(e) => { e.stopPropagation(); editRecipeCard(prompt.id); }}
                               className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20"
                             >编辑</button>
+                          )}
+                          {isCustomRecipe && prompt.saved && !prompt.uploaded && userEmail && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); uploadRecipeToServer(prompt.id); }}
+                              className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-sm text-blue-200 transition hover:bg-blue-500/20"
+                            >☁ 上传云端</button>
                           )}
                           {activeCategory === '配方' && (
                             <button

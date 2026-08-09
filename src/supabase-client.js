@@ -151,6 +151,35 @@ export async function saveRecipes(recipes) {
   return true;
 }
 
+// 保存单条配方到云端（上传功能）
+export async function uploadRecipe(recipe) {
+  if (!supabase) return false;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const id = recipe.id || `${recipe.title}-${recipe.category}`;
+
+  const { error } = await supabase
+    .from('recipes')
+    .upsert({
+      id,
+      user_id: user.id,
+      title: recipe.title,
+      content: recipe.content || '',
+      category: recipe.category || '配方',
+      custom: true,
+      saved: true,
+      in_workbench: recipe.inWorkbench !== undefined ? recipe.inWorkbench : false,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
+  if (error) {
+    console.warn('Failed to upload recipe:', error);
+    return false;
+  }
+  return true;
+}
+
 // 加载收藏
 export async function loadFavorites() {
   if (!supabase) return null;
