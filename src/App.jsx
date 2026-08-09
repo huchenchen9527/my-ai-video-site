@@ -240,7 +240,10 @@ function App() {
           (prompt.content || '').toLowerCase().includes(query);
         return matchesSearch;
       }).sort((a, b) => {
-        // 未上传云端的配方靠前显示
+        // 编辑中的窗口在最前
+        if (a.editing && !b.editing) return -1;
+        if (!a.editing && b.editing) return 1;
+        // 未上传的配方靠前
         if (a.uploaded === b.uploaded) return 0;
         return a.uploaded ? 1 : -1;
       });
@@ -353,6 +356,7 @@ function App() {
       custom: true,
       editing: true,
       saved: false,
+      uploaded: false,
       inWorkbench: false,
     };
     setRecipe((prev) => [newRecipe, ...prev]);
