@@ -106,16 +106,17 @@ function App() {
         const localRecipes = localRaw ? JSON.parse(localRaw) : [];
 
         if (cloudRecipes && cloudRecipes.length > 0) {
-          // 云端有数据，合并云端和本地，以云端为主
+          // 以云端为权威源，合并本地刚创建的新配方
           const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
           
-          // 本地有但云端没有的新配方（尚未同步到云端）
+          // 本地有但云端没有的新配方（刚创建，尚未同步）
           const unsynced = localRecipes.filter(p => {
             const id = p.id || `${p.title}-${p.category}`;
-            return !cloudIds.has(id) && p.custom === true;
+            return !cloudIds.has(id) && p.custom === true && p.content && p.content.trim();
           });
           
-          // 合并：云端数据 + 本地未同步的新配方
+          // 以云端为准 + 本地未同步的新配方
+          // 本地有但云端没有的配方（已被其他设备删除）不会保留
           const merged = [...cloudRecipes, ...unsynced];
           setRecipe(merged);
         } else if (localRecipes.length > 0) {
