@@ -45,6 +45,31 @@ export function onAuthChange(callback) {
   });
 }
 
+// 实时订阅 recipes 表变化
+export function subscribeToRecipes(onRecipesChanged) {
+  if (!supabase) return null;
+  
+  const channel = supabase
+    .channel('recipes-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'recipes' },
+      (payload) => {
+        onRecipesChanged(payload);
+      }
+    )
+    .subscribe();
+  
+  return channel;
+}
+
+// 取消订阅
+export function unsubscribeFromRecipes(channel) {
+  if (supabase && channel) {
+    supabase.removeChannel(channel);
+  }
+}
+
 // 加载配方
 export async function loadRecipes() {
   if (!supabase) return null;

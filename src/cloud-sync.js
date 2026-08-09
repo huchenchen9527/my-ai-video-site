@@ -1,7 +1,7 @@
 /**
  * 云端同步模块 - 通过 Supabase 实现用户账号云端存储
  */
-import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, loadStats, saveStats } from './supabase-client';
+import { loadRecipes, saveRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, loadStats, saveStats, subscribeToRecipes as subscribeToRecipesImpl, unsubscribeFromRecipes as unsubscribeFromRecipesImpl } from './supabase-client';
 
 /**
  * 从云端加载配方
@@ -134,4 +134,19 @@ export async function deleteRecipeFromCloud(recipeId) {
 
 export function isCloudConfigured() {
   return isSupabaseConfigured();
+}
+
+/**
+ * 订阅云端配方变化（实时同步）
+ */
+export function subscribeToRecipes(onRecipesChanged) {
+  if (!isSupabaseConfigured()) return null;
+  return subscribeToRecipesImpl(onRecipesChanged);
+}
+
+/**
+ * 取消订阅
+ */
+export function unsubscribeFromRecipes(channel) {
+  unsubscribeFromRecipesImpl(channel);
 }

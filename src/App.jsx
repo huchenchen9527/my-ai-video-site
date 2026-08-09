@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud } from './cloud-sync';
+import { loadRecipesFromCloud, saveRecipesToCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -148,6 +148,30 @@ function App() {
         } catch (e) {}
       }
     });
+
+    // 订阅云端配方变化，实现多设备实时同步
+    const channel = subscribeToRecipes(async () => {
+      try {
+        const cloudRecipes = await loadRecipesFromCloud();
+        if (cloudRecipes) {
+          setRecipe((prev) => {
+            const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
+            // 保留本地刚创建但尚未同步的配方（有内容但未在云端）
+            const localOnly = prev.filter(p => {
+              const id = p.id || `${p.title}-${p.category}`;
+              return p.custom === true && p.content && p.content.trim() && !cloudIds.has(id);
+            });
+            return [...cloudRecipes, ...localOnly];
+          });
+        }
+      } catch (e) {
+        console.warn('[realtime-sync] Failed to refresh recipes:', e);
+      }
+    });
+
+    return () => {
+      unsubscribeFromRecipes(channel);
+    };
   }, [userEmail]);
   const STORAGE_KEYS = {
     RECIPES: 'my_ai_recipes_v1',
