@@ -239,6 +239,10 @@ function App() {
           prompt.category.toLowerCase().includes(query) ||
           (prompt.content || '').toLowerCase().includes(query);
         return matchesSearch;
+      }).sort((a, b) => {
+        // 未上传云端的配方靠前显示
+        if (a.uploaded === b.uploaded) return 0;
+        return a.uploaded ? 1 : -1;
       });
     }
 
