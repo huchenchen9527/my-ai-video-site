@@ -226,9 +226,9 @@ function App() {
 
     if (activeCategory === '配方') {
       return recipe.filter((prompt) => {
-        // 只展示自定义配方卡片（已保存的配方，含仅本地和已上传）
+        // 展示自定义配方卡片：已保存的，或正在编辑中的
         if (!prompt.custom) return false;
-        if (!prompt.saved) return false;
+        if (!prompt.saved && !prompt.editing) return false;
         const matchesSearch =
           !query ||
           prompt.title.toLowerCase().includes(query) ||
