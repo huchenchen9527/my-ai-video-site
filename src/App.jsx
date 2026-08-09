@@ -516,13 +516,13 @@ function App() {
               />
             </div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.25em] text-amber-300">
-              <span className="tracking-[0.25em]">AI 视频提示词宝库</span>
+              <span className="tracking-[0.25em]">AI 视频提示词库</span>
               <span className="rounded-full bg-black/20 px-2.5 py-0.5 text-[12px] font-semibold tracking-[0.2em] text-amber-200">
                 {prompts.length} 条
               </span>
             </div>
             <h1 className="mt-4 text-3xl font-semibold text-white sm:text-4xl lg:text-5xl">
-              用更精准的提示词，做出更像电影的短视频
+              AI专业镜头语言，一键复制即拿即用
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
               搜索镜头、光影、构图、调色和转场语言，快速找到适合短剧、广告和概念片的创作提示词。
@@ -571,7 +571,7 @@ function App() {
                     : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
                 }`}
               >
-                {categoryIcons[category] || '✨'} {category}
+                {category}
               </button>
             ))}
             <button
@@ -582,7 +582,7 @@ function App() {
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              ★ 我的收藏
+              我的收藏
             </button>
             <button
               onClick={() => setActiveCategory('配方')}
@@ -592,7 +592,7 @@ function App() {
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              {categoryIcons['配方']} 我的配方
+              我的配方
             </button>
             </div>
           </div>
