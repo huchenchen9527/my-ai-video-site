@@ -77,6 +77,7 @@ function App() {
     }
   });
   const promptsRef = useRef(prompts);
+  const isInitialSyncRef = useRef(true);
 
   // Auth
   const { userEmail, handleLogin, handleLogout } = useAuth();
@@ -88,6 +89,7 @@ function App() {
       setRecipe([]);
       setFavoriteIds([]);
       setWorkbench([]);
+      isInitialSyncRef.current = true;
     }
   }, [userEmail]);
 
@@ -95,6 +97,8 @@ function App() {
   // 每次用户登录后都重新同步
   useEffect(() => {
     if (!userEmail) return; // 未登录时不执行云端同步
+    // 重置初始同步标志
+    isInitialSyncRef.current = true;
 
     Promise.all([
       loadRecipesFromCloud(),
@@ -129,6 +133,8 @@ function App() {
       } catch (e) {
         if (cloudRecipes) setRecipe(cloudRecipes);
       }
+      // 初始同步完成，后续 recipe 变化会触发云端同步
+      isInitialSyncRef.current = false;
 
       // 以云端收藏为准，合并本地未同步的
       if (cloudFavorites && cloudFavorites.length > 0) {
@@ -154,15 +160,8 @@ function App() {
       try {
         const cloudRecipes = await loadRecipesFromCloud();
         if (cloudRecipes) {
-          setRecipe((prev) => {
-            const cloudIds = new Set(cloudRecipes.map(p => p.id || `${p.title}-${p.category}`));
-            // 保留本地刚创建但尚未同步的配方（有内容但未在云端）
-            const localOnly = prev.filter(p => {
-              const id = p.id || `${p.title}-${p.category}`;
-              return p.custom === true && p.content && p.content.trim() && !cloudIds.has(id);
-            });
-            return [...cloudRecipes, ...localOnly];
-          });
+          // 以云端为权威源，不合并本地数据
+          setRecipe(cloudRecipes);
         }
       } catch (e) {
         console.warn('[realtime-sync] Failed to refresh recipes:', e);
@@ -181,11 +180,14 @@ function App() {
   };
 
   useEffect(() => {
+    // Always save to localStorage
     try {
       localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipe));
     } catch (e) {
       // ignore
     }
+    // Skip cloud sync until initial cloud load completes
+    if (isInitialSyncRef.current) return;
     // 只同步自定义配方到云端（静默失败，不影响本地体验）
     const customRecipes = recipe.filter(p => p.custom === true);
     saveRecipesToCloud(customRecipes).catch(() => {});
