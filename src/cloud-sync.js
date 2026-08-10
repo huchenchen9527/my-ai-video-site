@@ -1,7 +1,7 @@
 /**
  * 云端同步模块 - 通过 Supabase 实现用户账号云端存储
  */
-import { loadRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, subscribeToRecipes as subscribeToRecipesImpl, unsubscribeFromRecipes as unsubscribeFromRecipesImpl, uploadRecipe as uploadRecipeImpl } from './supabase-client';
+import { loadRecipes, loadFavorites, saveFavorite, deleteFavorite, getCurrentUser, isSupabaseConfigured, subscribeToRecipes as subscribeToRecipesImpl, unsubscribeFromRecipes as unsubscribeFromRecipesImpl, uploadRecipe as uploadRecipeImpl, loadCopiedCount, incrementCopiedCount } from './supabase-client';
 
 /**
  * 从云端加载配方
@@ -117,6 +117,36 @@ export async function uploadRecipeToCloud(recipe) {
     return await uploadRecipeImpl(recipe);
   } catch (e) {
     console.warn('Failed to upload recipe to cloud:', e);
+  }
+  return false;
+}
+
+/**
+ * 加载复制次数统计
+ */
+export async function loadCopiedCountFromCloud() {
+  if (!isSupabaseConfigured()) return 0;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return 0;
+    return await loadCopiedCount();
+  } catch (e) {
+    console.warn('Failed to load copied count from cloud:', e);
+  }
+  return 0;
+}
+
+/**
+ * 递增复制次数到云端
+ */
+export async function incrementCopiedCountToCloud() {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { data: { user } } = await getCurrentUser();
+    if (!user) return false;
+    return await incrementCopiedCount();
+  } catch (e) {
+    console.warn('Failed to increment copied count:', e);
   }
   return false;
 }

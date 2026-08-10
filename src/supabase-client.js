@@ -169,3 +169,62 @@ export async function deleteFavorite(id) {
 
   return !error;
 }
+
+// 加载复制次数统计
+export async function loadCopiedCount() {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('user_stats')
+    .select('copied_count')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.warn('Failed to load copied_count:', error);
+    return null;
+  }
+  return (data && data.copied_count) || 0;
+}
+
+// 更新复制次数统计（递增 1）
+export async function incrementCopiedCount() {
+  if (!supabase) return false;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  // 先查询当前值
+  const { data, error: fetchError } = await supabase
+    .from('user_stats')
+    .select('copied_count')
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    console.warn('Failed to fetch copied_count:', fetchError);
+    return false;
+  }
+
+  const currentCount = (data && data.copied_count) || 0;
+  const newCount = currentCount + 1;
+
+  // 使用 upsert 插入或更新
+  const { error } = await supabase
+    .from('user_stats')
+    .upsert({
+      user_id: user.id,
+      copied_count: newCount,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id'
+    });
+
+  if (error) {
+    console.warn('Failed to update copied_count:', error);
+    return false;
+  }
+
+  return true;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud } from './cloud-sync';
+import { loadRecipesFromCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud, loadCopiedCountFromCloud, incrementCopiedCountToCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -75,6 +75,7 @@ function App() {
       setRecipe([]);
       setFavoriteIds([]);
       setWorkbench([]);
+      setCopiedCount(0);
       isInitialSyncRef.current = true;
     }
   }, [userEmail]);
@@ -89,7 +90,8 @@ function App() {
     Promise.all([
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
-    ]).then(async ([cloudRecipes, cloudFavorites]) => {
+      loadCopiedCountFromCloud(),
+    ]).then(async ([cloudRecipes, cloudFavorites, cloudCopiedCount]) => {
       // 合并云端和本地配方
       try {
         const localRaw = localStorage.getItem('my_ai_recipes_v1');
@@ -140,6 +142,11 @@ function App() {
           const localFavorites = localRaw ? JSON.parse(localRaw) : [];
           if (localFavorites.length > 0) setFavoriteIds(localFavorites);
         } catch (e) {}
+      }
+
+      // 同步云端复制次数
+      if (cloudCopiedCount > 0) {
+        setCopiedCount(cloudCopiedCount);
       }
     });
 
@@ -303,6 +310,10 @@ function App() {
 
       setCopiedId(id);
       setCopiedCount((prev) => prev + 1);
+      // 同步到云端
+      if (userEmail) {
+        incrementCopiedCountToCloud().catch(() => {});
+      }
       setTimeout(() => setCopiedId(null), 1400);
     } catch {
       setCopiedId(null);
