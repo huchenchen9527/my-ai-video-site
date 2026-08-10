@@ -463,7 +463,7 @@ function App() {
 
   const copyCombinedRecipe = async () => {
     if (workbenchItems.length === 0) return;
-    const combined = workbenchItems.map((p) => p.content).join('\n\n-----\n\n');
+    const combined = workbenchItems.map((p) => p.content).join('\n\n');
     await handleCopy(combined, `combined-${Date.now()}`);
   };
 
