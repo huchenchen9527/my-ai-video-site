@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS user_stats (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id),
   copied_count INTEGER DEFAULT 0,
+  total_count INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -16,3 +17,6 @@ CREATE POLICY "Users can view their own stats"
 CREATE POLICY "Users can manage their own stats"
   ON user_stats FOR ALL
   USING (auth.uid() = user_id);
+
+-- 如果表已存在，添加 total_count 字段
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_count INTEGER DEFAULT 0;

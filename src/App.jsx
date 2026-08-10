@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { promptCategories, prompts } from './data/prompts';
-import { loadRecipesFromCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud, loadCopiedCountFromCloud, incrementCopiedCountToCloud } from './cloud-sync';
+import { loadRecipesFromCloud, deleteRecipeFromCloud, loadFavoritesFromCloud, saveFavoriteToCloud, deleteFavoriteFromCloud, subscribeToRecipes, unsubscribeFromRecipes, uploadRecipeToCloud, loadCopiedCountFromCloud, incrementCopiedCountToCloud, loadTotalCountFromCloud, updateTotalCountToCloud } from './cloud-sync';
 import { AuthModal, UserMenu, useAuth } from './Auth';
 
 const VALID_CATEGORIES = ['全部', '收藏', '配方', ...promptCategories];
@@ -46,6 +46,7 @@ function App() {
   const [videoError, setVideoError] = useState(false);
   const [categoryPinned, setCategoryPinned] = useState(false);
   const [copiedCount, setCopiedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(prompts.length);
   const [recipe, setRecipe] = useState(() => {
     try {
       const raw = localStorage.getItem('my_ai_recipes_v1');
@@ -76,6 +77,7 @@ function App() {
       setFavoriteIds([]);
       setWorkbench([]);
       setCopiedCount(0);
+      setTotalCount(prompts.length);
       isInitialSyncRef.current = true;
     }
   }, [userEmail]);
@@ -91,7 +93,8 @@ function App() {
       loadRecipesFromCloud(),
       loadFavoritesFromCloud(),
       loadCopiedCountFromCloud(),
-    ]).then(async ([cloudRecipes, cloudFavorites, cloudCopiedCount]) => {
+      loadTotalCountFromCloud(),
+    ]).then(async ([cloudRecipes, cloudFavorites, cloudCopiedCount, cloudTotalCount]) => {
       // 合并云端和本地配方
       try {
         const localRaw = localStorage.getItem('my_ai_recipes_v1');
@@ -148,6 +151,11 @@ function App() {
       if (cloudCopiedCount > 0) {
         setCopiedCount(cloudCopiedCount);
       }
+
+      // 同步云端累计收录总数
+      if (cloudTotalCount > 0) {
+        setTotalCount(cloudTotalCount);
+      }
     });
 
     // 订阅云端配方变化，实现多设备实时同步
@@ -187,6 +195,15 @@ function App() {
       // ignore
     }
   }, [recipe]);
+
+  // 同步累计收录总数到云端（预设 + 自定义配方）
+  useEffect(() => {
+    const total = prompts.length + recipe.length;
+    setTotalCount(total);
+    if (userEmail) {
+      updateTotalCountToCloud(total);
+    }
+  }, [recipe.length, userEmail]);
 
   useEffect(() => {
     try {
@@ -766,7 +783,7 @@ function App() {
             {[
               { label: '昨日更新提示词', value: `${prompts.length} 条` },
               { label: '昨日活跃在线', value: '1.8k+' },
-              { label: '累计收录爆款', value: '68 条' },
+              { label: '累计收录爆款', value: `${totalCount} 条` },
               { label: '累计被复制次数', value: `${copiedCount} 次` },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-transparent px-2 py-3 text-left sm:text-center">
